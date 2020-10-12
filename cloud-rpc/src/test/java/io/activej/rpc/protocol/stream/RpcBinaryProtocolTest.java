@@ -1,8 +1,10 @@
 package io.activej.rpc.protocol.stream;
 
 import io.activej.common.MemSize;
-import io.activej.csp.process.ChannelLZ4Compressor;
-import io.activej.csp.process.ChannelLZ4Decompressor;
+import io.activej.csp.process.compression.ChannelCompressor;
+import io.activej.csp.process.compression.ChannelDecompressor;
+import io.activej.csp.process.compression.LZ4BlockCompressor;
+import io.activej.csp.process.compression.LZ4BlockDecompressor;
 import io.activej.datastream.StreamSupplier;
 import io.activej.datastream.csp.ChannelDeserializer;
 import io.activej.datastream.csp.ChannelSerializer;
@@ -82,8 +84,8 @@ public final class RpcBinaryProtocolTest {
 		StreamSupplier<RpcMessage> supplier = StreamSupplier.ofIterable(sourceList)
 				.transformWith(ChannelSerializer.create(binarySerializer)
 						.withInitialBufferSize(MemSize.of(1)))
-				.transformWith(ChannelLZ4Compressor.createFastCompressor())
-				.transformWith(ChannelLZ4Decompressor.create())
+				.transformWith(ChannelCompressor.create(LZ4BlockCompressor.createFastCompressor()))
+				.transformWith(ChannelDecompressor.create(LZ4BlockDecompressor.create()))
 				.transformWith(ChannelDeserializer.create(binarySerializer));
 
 		List<RpcMessage> list = await(supplier.toList());

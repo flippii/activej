@@ -5,8 +5,10 @@ import io.activej.bytebuf.ByteBufQueue;
 import io.activej.common.MemSize;
 import io.activej.csp.ChannelSupplier;
 import io.activej.csp.process.ChannelByteChunker;
-import io.activej.csp.process.ChannelLZ4Compressor;
-import io.activej.csp.process.ChannelLZ4Decompressor;
+import io.activej.csp.process.compression.ChannelCompressor;
+import io.activej.csp.process.compression.ChannelDecompressor;
+import io.activej.csp.process.compression.LZ4BlockCompressor;
+import io.activej.csp.process.compression.LZ4BlockDecompressor;
 import io.activej.test.rules.ByteBufRule;
 import io.activej.test.rules.EventloopRule;
 import org.junit.ClassRule;
@@ -38,9 +40,9 @@ public final class StreamLZ4Test {
 
 		ChannelSupplier<ByteBuf> supplier = ChannelSupplier.ofList(buffers)
 				.transformWith(ChannelByteChunker.create(MemSize.of(64), MemSize.of(128)))
-				.transformWith(ChannelLZ4Compressor.createFastCompressor())
+				.transformWith(ChannelCompressor.create(LZ4BlockCompressor.createFastCompressor()))
 				.transformWith(ChannelByteChunker.create(MemSize.of(64), MemSize.of(128)))
-				.transformWith(ChannelLZ4Decompressor.create());
+				.transformWith(ChannelDecompressor.create(LZ4BlockDecompressor.create()));
 
 		ByteBuf collected = await(supplier.toCollector(ByteBufQueue.collector()));
 		assertArrayEquals(expected, collected.asArray());
@@ -49,25 +51,25 @@ public final class StreamLZ4Test {
 
 	@Test
 	public void testLz4Fast() {
-		doTest(ChannelLZ4Compressor.createFastCompressor());
+		doTest(LZ4BlockCompressor.createFastCompressor());
 	}
 
 	@Test
 	public void testLz4High() {
-		doTest(ChannelLZ4Compressor.createHighCompressor());
+		doTest(LZ4BlockCompressor.createHighCompressor());
 	}
 
 	@Test
 	public void testLz4High10() {
-		doTest(ChannelLZ4Compressor.createHighCompressor(10));
+		doTest(LZ4BlockCompressor.createHighCompressor(10));
 	}
 
-	private void doTest(ChannelLZ4Compressor compressor) {
+	private void doTest(LZ4BlockCompressor compressor) {
 		byte[] data = "1".getBytes();
 
 		ChannelSupplier<ByteBuf> supplier = ChannelSupplier.of(ByteBuf.wrapForReading(data))
-				.transformWith(compressor)
-				.transformWith(ChannelLZ4Decompressor.create());
+				.transformWith(ChannelCompressor.create(compressor))
+				.transformWith(ChannelDecompressor.create(LZ4BlockDecompressor.create()));
 
 		ByteBuf collected = await(supplier.toCollector(ByteBufQueue.collector()));
 		assertArrayEquals(data, collected.asArray());

@@ -8,8 +8,10 @@ import io.activej.bytebuf.ByteBufQueue;
 import io.activej.codegen.DefiningClassLoader;
 import io.activej.common.exception.parse.UnknownFormatException;
 import io.activej.csp.ChannelSupplier;
-import io.activej.csp.process.ChannelLZ4Compressor;
-import io.activej.csp.process.ChannelLZ4Decompressor;
+import io.activej.csp.process.compression.ChannelCompressor;
+import io.activej.csp.process.compression.ChannelDecompressor;
+import io.activej.csp.process.compression.LZ4BlockCompressor;
+import io.activej.csp.process.compression.LZ4BlockDecompressor;
 import io.activej.cube.Cube;
 import io.activej.cube.IdGeneratorStub;
 import io.activej.cube.LogItem;
@@ -152,7 +154,7 @@ public final class CubeLogProcessorControllerTest {
 
 		String logFile = first(files.keySet());
 		ByteBuf serializedData = await(logsFs.download(logFile).then(supplier -> supplier
-				.transformWith(ChannelLZ4Decompressor.create())
+				.transformWith(ChannelDecompressor.create(LZ4BlockDecompressor.create()))
 				.toCollector(ByteBufQueue.collector())));
 
 		// offset right before string
@@ -162,7 +164,7 @@ public final class CubeLogProcessorControllerTest {
 		byte[] malformed = new byte[bufSize - 49];
 		malformed[0] = 127; // exceeds message size
 		await(ChannelSupplier.of(serializedData, ByteBuf.wrapForReading(malformed))
-				.transformWith(ChannelLZ4Compressor.createFastCompressor())
+				.transformWith(ChannelCompressor.create(LZ4BlockCompressor.createFastCompressor()))
 				.streamTo(logsFs.upload(logFile)));
 
 		UnknownFormatException exception = awaitException(controller.process());

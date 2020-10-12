@@ -1,4 +1,4 @@
-package io.activej.csp.process;
+package io.activej.csp.process.compression;
 
 import io.activej.bytebuf.ByteBuf;
 import io.activej.bytebuf.ByteBufQueue;
@@ -7,7 +7,6 @@ import io.activej.csp.ChannelConsumer;
 import io.activej.csp.ChannelSupplier;
 import io.activej.test.rules.ByteBufRule;
 import io.activej.test.rules.EventloopRule;
-import net.jpountz.lz4.LZ4Factory;
 import org.junit.ClassRule;
 import org.junit.Test;
 
@@ -27,8 +26,8 @@ public class ChannelLZ4DecompressorTest {
 
 	@Test
 	public void testTruncatedData() {
-		ChannelLZ4Compressor compressor = ChannelLZ4Compressor.create(LZ4Factory.fastestInstance().fastCompressor());
-		ChannelLZ4Decompressor decompressor = ChannelLZ4Decompressor.create();
+		ChannelCompressor compressor = ChannelCompressor.create(LZ4BlockCompressor.createFastCompressor());
+		ChannelDecompressor decompressor = ChannelDecompressor.create(LZ4BlockDecompressor.create());
 		ByteBufQueue queue = new ByteBufQueue();
 
 		await(ChannelSupplier.of(ByteBufStrings.wrapAscii("TestData")).transformWith(compressor)

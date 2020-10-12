@@ -20,8 +20,10 @@ import io.activej.common.MemSize;
 import io.activej.common.exception.CloseException;
 import io.activej.csp.ChannelConsumer;
 import io.activej.csp.ChannelSupplier;
-import io.activej.csp.process.ChannelLZ4Compressor;
-import io.activej.csp.process.ChannelLZ4Decompressor;
+import io.activej.csp.process.compression.ChannelCompressor;
+import io.activej.csp.process.compression.ChannelDecompressor;
+import io.activej.csp.process.compression.LZ4BlockCompressor;
+import io.activej.csp.process.compression.LZ4BlockDecompressor;
 import io.activej.datastream.AbstractStreamConsumer;
 import io.activej.datastream.AbstractStreamSupplier;
 import io.activej.datastream.StreamDataAcceptor;
@@ -90,8 +92,8 @@ public final class RpcStream {
 		ChannelDeserializer<RpcMessage> deserializer = ChannelDeserializer.create(messageSerializer);
 
 		if (compression) {
-			ChannelLZ4Decompressor decompressor = ChannelLZ4Decompressor.create();
-			ChannelLZ4Compressor compressor = ChannelLZ4Compressor.createFastCompressor();
+			ChannelDecompressor decompressor = ChannelDecompressor.create(LZ4BlockDecompressor.create());
+			ChannelCompressor compressor = ChannelCompressor.create(LZ4BlockCompressor.createFastCompressor());
 
 			ChannelSupplier.ofSocket(socket).bindTo(decompressor.getInput());
 			decompressor.getOutput().bindTo(deserializer.getInput());

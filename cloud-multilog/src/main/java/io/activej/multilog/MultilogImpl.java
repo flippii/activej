@@ -21,8 +21,10 @@ import io.activej.common.MemSize;
 import io.activej.common.exception.parse.TruncatedDataException;
 import io.activej.common.time.Stopwatch;
 import io.activej.csp.binary.BinaryChannelSupplier;
-import io.activej.csp.process.ChannelLZ4Compressor;
-import io.activej.csp.process.ChannelLZ4Decompressor;
+import io.activej.csp.process.compression.ChannelCompressor;
+import io.activej.csp.process.compression.ChannelDecompressor;
+import io.activej.csp.process.compression.LZ4BlockCompressor;
+import io.activej.csp.process.compression.LZ4BlockDecompressor;
 import io.activej.datastream.StreamConsumer;
 import io.activej.datastream.StreamSupplier;
 import io.activej.datastream.StreamSupplierWithResult;
@@ -116,7 +118,7 @@ public final class MultilogImpl<T> implements Multilog<T>, EventloopJmxBeanEx {
 								.withAutoFlushInterval(autoFlushInterval)
 								.withInitialBufferSize(bufferSize)
 								.withSkipSerializationErrors())
-						.transformWith(ChannelLZ4Compressor.createFastCompressor())
+						.transformWith(ChannelCompressor.create(LZ4BlockCompressor.createFastCompressor()))
 						.transformWith(streamWrites.register(logPartition))
 						.transformWith(streamWriteStats)
 						.bindTo(new LogStreamChunker(eventloop, fs, namingScheme, logPartition))));
@@ -199,16 +201,20 @@ public final class MultilogImpl<T> implements Multilog<T>, EventloopJmxBeanEx {
 									return Promise.of(fileStream
 											.transformWith(streamReads.register(logPartition + ":" + currentLogFile + "@" + position))
 											.transformWith(streamReadStats)
-											.transformWith(ChannelLZ4Decompressor.create()
-													.withInspector(new ChannelLZ4Decompressor.Inspector() {
+											.transformWith(ChannelDecompressor.create(LZ4BlockDecompressor.create())
+													.withInspector(new ChannelDecompressor.Inspector() {
 														@Override
-														public <Q extends ChannelLZ4Decompressor.Inspector> Q lookup(Class<Q> type) {
-															throw new UnsupportedOperationException();
+														public void onBlock(int blockLength, ByteBuf outputBuf) {
+															inputStreamPosition += blockLength;
 														}
 
 														@Override
-														public void onBlock(ChannelLZ4Decompressor self, ChannelLZ4Decompressor.Header header, ByteBuf inputBuf, ByteBuf outputBuf) {
-															inputStreamPosition += ChannelLZ4Decompressor.HEADER_LENGTH + header.compressedLen;
+														public void onEndOfStreamBlock(int blockLength) {
+														}
+
+														@Override
+														public <Q extends ChannelDecompressor.Inspector> Q lookup(Class<Q> type) {
+															throw new UnsupportedOperationException();
 														}
 													}))
 											.transformWith(supplier ->
@@ -219,7 +225,7 @@ public final class MultilogImpl<T> implements Multilog<T>, EventloopJmxBeanEx {
 																}
 																if (ignoreMalformedLogs &&
 																		e2 instanceof TruncatedDataException ||
-																		e2 == ChannelLZ4Decompressor.STREAM_IS_CORRUPTED ||
+																		e2 == LZ4BlockDecompressor.STREAM_IS_CORRUPTED ||
 																		e2 == BinaryChannelSupplier.UNEXPECTED_DATA_EXCEPTION) {
 																	if (logger.isWarnEnabled()) {
 																		logger.warn("Ignoring malformed log file {}:`{}` in {}, previous position: {}",

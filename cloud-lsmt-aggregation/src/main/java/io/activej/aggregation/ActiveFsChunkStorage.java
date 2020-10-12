@@ -26,8 +26,10 @@ import io.activej.common.exception.parse.ParseException;
 import io.activej.common.ref.RefInt;
 import io.activej.csp.ChannelSupplier;
 import io.activej.csp.process.ChannelByteChunker;
-import io.activej.csp.process.ChannelLZ4Compressor;
-import io.activej.csp.process.ChannelLZ4Decompressor;
+import io.activej.csp.process.compression.ChannelCompressor;
+import io.activej.csp.process.compression.ChannelDecompressor;
+import io.activej.csp.process.compression.LZ4BlockCompressor;
+import io.activej.csp.process.compression.LZ4BlockDecompressor;
 import io.activej.datastream.StreamConsumer;
 import io.activej.datastream.StreamSupplier;
 import io.activej.datastream.csp.ChannelDeserializer;
@@ -166,7 +168,7 @@ public final class ActiveFsChunkStorage<C> implements AggregationChunkStorage<C>
 				.whenComplete(promiseOpenR.recordStats())
 				.map(supplier -> supplier
 						.transformWith(readFile)
-						.transformWith(ChannelLZ4Decompressor.create())
+						.transformWith(ChannelDecompressor.create(LZ4BlockDecompressor.create()))
 						.transformWith(readDecompress)
 						.transformWith(ChannelDeserializer.create(
 								createBinarySerializer(aggregation, recordClass, aggregation.getKeys(), fields, classLoader)))
@@ -187,7 +189,7 @@ public final class ActiveFsChunkStorage<C> implements AggregationChunkStorage<C>
 										createBinarySerializer(aggregation, recordClass, aggregation.getKeys(), fields, classLoader))
 										.withInitialBufferSize(bufferSize))
 								.transformWith(writeCompress)
-								.transformWith(ChannelLZ4Compressor.createFastCompressor())
+								.transformWith(ChannelCompressor.create(LZ4BlockCompressor.createFastCompressor()))
 								.transformWith(writeChunker)
 								.transformWith(ChannelByteChunker.create(
 										bufferSize.map(bytes -> bytes / 2),

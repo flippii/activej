@@ -20,8 +20,10 @@ import io.activej.common.MemSize;
 import io.activej.csp.file.ChannelFileReader;
 import io.activej.csp.file.ChannelFileWriter;
 import io.activej.csp.process.ChannelByteChunker;
-import io.activej.csp.process.ChannelLZ4Compressor;
-import io.activej.csp.process.ChannelLZ4Decompressor;
+import io.activej.csp.process.compression.ChannelCompressor;
+import io.activej.csp.process.compression.ChannelDecompressor;
+import io.activej.csp.process.compression.LZ4BlockCompressor;
+import io.activej.csp.process.compression.LZ4BlockDecompressor;
 import io.activej.datastream.StreamConsumer;
 import io.activej.datastream.StreamSupplier;
 import io.activej.datastream.csp.ChannelDeserializer;
@@ -132,7 +134,7 @@ public final class StreamSorterStorageImpl<T> implements StreamSorterStorage<T> 
 						.transformWith(ChannelSerializer.create(serializer)
 								.withInitialBufferSize(readBlockSize))
 						.transformWith(ChannelByteChunker.create(writeBlockSize.map(bytes -> bytes / 2), writeBlockSize))
-						.transformWith(ChannelLZ4Compressor.create(compressionLevel))
+						.transformWith(ChannelCompressor.create(LZ4BlockCompressor.create(compressionLevel)))
 						.transformWith(ChannelByteChunker.create(writeBlockSize.map(bytes -> bytes / 2), writeBlockSize))
 						.streamTo(ChannelFileWriter.open(executor, path))));
 	}
@@ -149,7 +151,7 @@ public final class StreamSorterStorageImpl<T> implements StreamSorterStorage<T> 
 
 		return ChannelFileReader.open(executor, path)
 				.map(file -> file
-						.transformWith(ChannelLZ4Decompressor.create())
+						.transformWith(ChannelDecompressor.create(LZ4BlockDecompressor.create()))
 						.transformWith(ChannelDeserializer.create(serializer)));
 	}
 

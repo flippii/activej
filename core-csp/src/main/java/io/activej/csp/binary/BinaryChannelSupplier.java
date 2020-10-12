@@ -22,6 +22,7 @@ import io.activej.async.process.AsyncCloseable;
 import io.activej.bytebuf.ByteBuf;
 import io.activej.bytebuf.ByteBufQueue;
 import io.activej.common.exception.parse.ParseException;
+import io.activej.common.exception.parse.TruncatedDataException;
 import io.activej.csp.ChannelSupplier;
 import io.activej.promise.Promise;
 import org.jetbrains.annotations.NotNull;
@@ -31,7 +32,7 @@ import java.util.List;
 
 public abstract class BinaryChannelSupplier extends AbstractAsyncCloseable {
 	public static final Exception UNEXPECTED_DATA_EXCEPTION = new ParseException(BinaryChannelSupplier.class, "Unexpected data after end-of-stream");
-	public static final Exception UNEXPECTED_END_OF_STREAM_EXCEPTION = new ParseException(BinaryChannelSupplier.class, "Unexpected end-of-stream");
+	public static final Exception UNEXPECTED_END_OF_STREAM_EXCEPTION = new TruncatedDataException(BinaryChannelSupplier.class, "Unexpected end-of-stream");
 
 	protected final ByteBufQueue bufs;
 
