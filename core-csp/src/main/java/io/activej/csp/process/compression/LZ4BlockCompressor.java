@@ -22,6 +22,7 @@ import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.xxhash.StreamingXXHash32;
 import net.jpountz.xxhash.XXHashFactory;
+import org.jetbrains.annotations.NotNull;
 
 import static io.activej.common.Checks.checkArgument;
 import static java.lang.Math.max;
@@ -49,6 +50,8 @@ public final class LZ4BlockCompressor implements BlockCompressor {
 	private final LZ4Compressor compressor;
 	private final StreamingXXHash32 checksum = XXHashFactory.fastestInstance().newStreamingHash32(DEFAULT_SEED);
 
+	private boolean customEndOfStream;
+
 	private LZ4BlockCompressor(LZ4Compressor compressor) {
 		this.compressor = compressor;
 	}
@@ -73,9 +76,41 @@ public final class LZ4BlockCompressor implements BlockCompressor {
 		return new LZ4BlockCompressor(LZ4Factory.fastestInstance().highCompressor(compressionLevel));
 	}
 
+	public LZ4BlockCompressor withCustomEndOfStreamBlock(boolean customEndOfStream) {
+		this.customEndOfStream = customEndOfStream;
+		return this;
+	}
+
 	@Override
 	public ByteBuf compress(ByteBuf inputBuf) {
-		int len = checkArgument(inputBuf.readRemaining(), remaining -> remaining != 0);
+		checkArgument(inputBuf.readRemaining() > 0);
+		return doCompress(inputBuf);
+	}
+
+	@Override
+	public ByteBuf getEndOfStreamBlock() {
+		if (customEndOfStream) {
+			return doCompress(ByteBuf.empty());
+		}
+
+		int compressionLevel = compressionLevel(MIN_BLOCK_SIZE);
+
+		ByteBuf outputBuf = ByteBufPool.allocate(HEADER_LENGTH);
+		byte[] outputBytes = outputBuf.array();
+		System.arraycopy(MAGIC, 0, outputBytes, 0, MAGIC_LENGTH);
+
+		outputBytes[MAGIC_LENGTH] = (byte) (COMPRESSION_METHOD_RAW | compressionLevel);
+		writeIntLE(0, outputBytes, MAGIC_LENGTH + 1);
+		writeIntLE(0, outputBytes, MAGIC_LENGTH + 5);
+		writeIntLE(0, outputBytes, MAGIC_LENGTH + 9);
+
+		outputBuf.tail(HEADER_LENGTH);
+		return outputBuf;
+	}
+
+	@NotNull
+	private ByteBuf doCompress(ByteBuf inputBuf) {
+		int len = inputBuf.readRemaining();
 		int off = inputBuf.head();
 		byte[] bytes = inputBuf.array();
 
@@ -112,23 +147,6 @@ public final class LZ4BlockCompressor implements BlockCompressor {
 
 		outputBuf.tail(HEADER_LENGTH + compressedLength);
 
-		return outputBuf;
-	}
-
-	@Override
-	public ByteBuf getEndOfStreamBlock() {
-		int compressionLevel = compressionLevel(MIN_BLOCK_SIZE);
-
-		ByteBuf outputBuf = ByteBufPool.allocate(HEADER_LENGTH);
-		byte[] outputBytes = outputBuf.array();
-		System.arraycopy(MAGIC, 0, outputBytes, 0, MAGIC_LENGTH);
-
-		outputBytes[MAGIC_LENGTH] = (byte) (COMPRESSION_METHOD_RAW | compressionLevel);
-		writeIntLE(0, outputBytes, MAGIC_LENGTH + 1);
-		writeIntLE(0, outputBytes, MAGIC_LENGTH + 5);
-		writeIntLE(0, outputBytes, MAGIC_LENGTH + 9);
-
-		outputBuf.tail(HEADER_LENGTH);
 		return outputBuf;
 	}
 

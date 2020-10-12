@@ -38,6 +38,8 @@ public final class LZ4BlockDecompressor implements BlockDecompressor {
 	private final StreamingXXHash32 checksum;
 	private final Header header = new Header();
 
+	private boolean customEndOfStream;
+
 	// region creators
 	private LZ4BlockDecompressor(LZ4FastDecompressor decompressor, StreamingXXHash32 checksum) {
 		this.decompressor = decompressor;
@@ -52,6 +54,11 @@ public final class LZ4BlockDecompressor implements BlockDecompressor {
 
 	public static LZ4BlockDecompressor create(LZ4FastDecompressor decompressor, XXHashFactory xxHashFactory) {
 		return new LZ4BlockDecompressor(decompressor, xxHashFactory.newStreamingHash32(DEFAULT_SEED));
+	}
+
+	public LZ4BlockDecompressor withCustomEndOfStreamBlock(boolean customEndOfStream) {
+		this.customEndOfStream = customEndOfStream;
+		return this;
 	}
 
 	@Nullable
@@ -98,10 +105,16 @@ public final class LZ4BlockDecompressor implements BlockDecompressor {
 			throw STREAM_IS_CORRUPTED;
 		}
 		if (header.originalLen == 0) {
-			if (header.check != 0) {
+			if (customEndOfStream) {
+				checksum.reset();
+				if (header.check == checksum.getValue()) {
+					header.finished = true;
+				}
+			} else if (header.check == 0) {
+				header.finished = true;
+			} else {
 				throw STREAM_IS_CORRUPTED;
 			}
-			header.finished = true;
 		}
 	}
 
